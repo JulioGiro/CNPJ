@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Consulta CNPJ</title>
+
+  <!-- React -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+
+  <!-- React DOM -->
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-100">
+
+<div id="root"></div>
+
+<script type="text/babel">
+
+const { useState, useMemo } = React;
+
+function Card({ titulo, valor }) {
+
+  return (
+
+    <div className="bg-slate-100 rounded-2xl p-4">
+
+      <div className="text-sm text-slate-500 mb-1">
+        {titulo}
+      </div>
+
+      <div className="font-semibold text-slate-800 break-words">
+        {valor || "-"}
+      </div>
+
+    </div>
+
+  );
+}
+
+function App() {
+
+  const [cnpj, setCnpj] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState("");
+  const [dados, setDados] = useState(null);
+
+  const limparNumeros = (valor) =>
+    valor.replace(/\D/g, "");
+
+  const formatarCnpj = (valor) => {
+
+    return valor
+      .replace(/\D/g, "")
+      .replace(/^(\d{2})(\d)/, "$1.$2")
+      .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/\.(\d{3})(\d)/, ".$1/$2")
+      .replace(/(\d{4})(\d)/, "$1-$2")
+      .slice(0, 18);
+  };
+
+  const formatarCpfCnpj = (valor) => {
+
+    if (!valor) return "-";
+
+    const v = valor.replace(/\D/g, "");
+
+    if (v.length === 11) {
+
+      return v.replace(
+        /(\d{3})(\d{3})(\d{3})(\d{2})/,
+        "$1.$2.$3-$4"
+      );
+    }
+
+    if (v.length === 14) {
+      return formatarCnpj(v);
+    }
+
+    return valor;
+  };
+
+  const formatarCep = (cep) => {
+
+    if (!cep) return "-";
+
+    const v = limparNumeros(String(cep));
+
+    return v.replace(
+      /^(\d{5})(\d{3})$/,
+      "$1-$2"
+    );
+  };
+
+  const formatarTelefone = (telefone) => {
+
+    if (!telefone) return "-";
+
+    const v = limparNumeros(String(telefone));
+
+    if (v.length === 11) {
+
+      return v.replace(
+        /^(\d{2})(\d{5})(\d{4})$/,
+        "($1) $2-$3"
+      );
+    }
+
+    if (v.length === 10) {
+
+      return v.replace(
+        /^(\d{2})(\d{4})(\d{4})$/,
+        "($1) $2-$3"
+      );
+    }
+
+    return telefone;
+  };
+
+  const formatarData = (data) => {
+
+    if (!data) return "-";
+
+    try {
+
+      const d = new Date(data);
+
+      if (isNaN(d.getTime())) {
+        return data;
+      }
+
+      return d.toLocaleDateString("pt-BR");
+
+    } catch {
+
+      return data;
+
+    }
+  };
+
+  const formatarCapital = (valor) => {
+
+    if (
+      valor === undefined ||
+      valor === null
+    ) return "-";
+
+    return Number(valor).toLocaleString(
+      "pt-BR",
+      {
+        style: "currency",
+        currency: "BRL",
+      }
+    );
+  };
+
+  const formatarBooleano = (valor) => {
+    return valor ? "Sim" : "Não";
+  };
+
+  const contarCamposPreenchidos = (obj) => {
+
+    let total = 0;
+
+    const percorrer = (valor) => {
+
+      if (Array.isArray(valor)) {
+
+        valor.forEach(percorrer);
+
+      } else if (
+        typeof valor === "object" &&
+        valor !== null
+      ) {
+
+        Object.values(valor).forEach(
+          percorrer
+        );
+
+      } else if (
+        valor !== null &&
+        valor !== undefined &&
+        valor !== ""
+      ) {
+
+        total++;
+
+      }
+    };
+
+    percorrer(obj);
+
+    return total;
+  };
+
+  const totalCampos = useMemo(() => {
+
+    if (!dados) return 0;
+
+    return contarCamposPreenchidos(
+      dados
+    );
+
+  }, [dados]);
+
+  const consultarCnpj = async () => {
+
+    try {
+
+      setLoading(true);
+      setErro("");
+      setDados(null);
+
+      const numero =
+        limparNumeros(cnpj);
+
+      if (numero.length !== 14) {
+
+        throw new Error(
+          "Informe um CNPJ válido."
+        );
+      }
+
+      const response = await fetch(
+        `https://publica.cnpj.ws/cnpj/${numero}`
+      );
+
+      if (!response.ok) {
+
+        throw new Error(
+          "CNPJ não encontrado."
+        );
+      }
+
+      const json = await response.json();
+
+      setDados(json);
+
+    } catch (e) {
+
+      setErro(e.message);
+
+    } finally {
+
+      setLoading(false);
+
+    }
+  };
+
+  return (
+
+    <div className="min-h-screen p-4 md:p-8">
+
+      <div className="max-w-7xl mx-auto">
+
+        {/* HEADER */}
+        <div className="bg-white rounded-3xl shadow-xl p-6 mb-6">
+
+          <h1 className="text-3xl font-bold text-slate-800">
+            Consulta CNPJ
+          </h1>
+
+          <p className="text-slate-500 mt-2">
+            Consulta inteligente utilizando API pública
+          </p>
+
+        </div>
+
+        {/* CONSULTA */}
+        <div className="bg-white rounded-3xl shadow-xl p-6 mb-6">
+
+          <div className="grid md:grid-cols-3 gap-4">
+
+            <div className="md:col-span-2">
+
+              <label className="text-sm text-slate-600 mb-1 block">
+                CNPJ
+              </label>
+
+              <input
+                value={cnpj}
+                onChange={(e) =>
+                  setCnpj(
+                    formatarCnpj(
+                      e.target.value
+                    )
+                  )
+                }
+                placeholder="00.000.000/0000-00"
+                className="w-full border border-slate-300 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-slate-400"
+              />
+
+            </div>
+
+            <div className="flex items-end">
+
+              <button
+                onClick={consultarCnpj}
+                disabled={loading}
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-2xl px-4 py-3 font-semibold transition"
+              >
+                {loading
+                  ? "Consultando..."
+                  : "Consultar"}
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* ERRO */}
+        {erro && (
+
+          <div className="bg-red-100 border border-red-300 text-red-700 rounded-2xl p-4 mb-6">
+            {erro}
+          </div>
+
+        )}
+
+        {/* RESULTADO */}
+        {dados && (
+          <>
+
+            {/* RESUMO */}
+            <div className="bg-white rounded-3xl shadow-xl p-6 mb-6">
+
+              <div className="mb-6">
+
+                <h2 className="text-2xl font-bold text-slate-800">
+                  {dados.razao_social || "-"}
+                </h2>
+
+                <p className="text-slate-500">
+                  {dados.nome_fantasia ||
+                    "Sem fantasia"}
+                </p>
+
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+
+                <Card
+                  titulo="Situação"
+                  valor={
+                    dados.estabelecimento
+                      ?.situacao_cadastral
+                  }
+                />
+
+                <Card
+                  titulo="Data Situação Cadastral"
+                  valor={formatarData(
+                    dados.estabelecimento
+                      ?.data_situacao_cadastral
+                  )}
+                />
+
+                <Card
+                  titulo="Data Início Atividade"
+                  valor={formatarData(
+                    dados.estabelecimento
+                      ?.data_inicio_atividade
+                  )}
+                />
+
+                <Card
+                  titulo="CNPJ"
+                  valor={formatarCnpj(
+                    dados.cnpj || ""
+                  )}
+                />
+
+                <Card
+                  titulo="Capital Social"
+                  valor={formatarCapital(
+                    dados.capital_social
+                  )}
+                />
+
+                <Card
+                  titulo="Cidade / UF"
+                  valor={`${dados.estabelecimento?.cidade?.nome || "-"
+                    } / ${dados.estabelecimento?.estado?.sigla || "-"
+                    }`}
+                />
+
+                <Card
+                  titulo="Telefone"
+                  valor={formatarTelefone(
+                    dados.estabelecimento
+                      ?.telefone1
+                  )}
+                />
+
+                <Card
+                  titulo="E-mail"
+                  valor={
+                    dados.estabelecimento
+                      ?.email || "-"
+                  }
+                />
+
+                <Card
+                  titulo="CEP"
+                  valor={formatarCep(
+                    dados.estabelecimento
+                      ?.cep
+                  )}
+                />
+
+                <Card
+                  titulo="Campos preenchidos"
+                  valor={totalCampos}
+                />
+
+              </div>
+
+              {/* ENDEREÇO */}
+              <div className="mt-6 border-t pt-6">
+
+                <h3 className="text-xl font-bold mb-3">
+                  Endereço
+                </h3>
+
+                <div className="bg-slate-100 rounded-2xl p-4 text-slate-700">
+
+                  {dados.estabelecimento
+                    ?.tipo_logradouro}{" "}
+
+                  {dados.estabelecimento
+                    ?.logradouro},{" "}
+
+                  {dados.estabelecimento
+                    ?.numero}
+
+                  {dados.estabelecimento
+                    ?.bairro
+                    ? ` - ${dados.estabelecimento?.bairro}`
+                    : ""}
+
+                  <br />
+
+                  {dados.estabelecimento
+                    ?.cidade?.nome} - {" "}
+                  {dados.estabelecimento
+                    ?.estado?.sigla}
+
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* SIMPLES / MEI */}
+            <div className="bg-white rounded-3xl shadow-xl p-6 mb-6">
+
+              <h2 className="text-2xl font-bold mb-6">
+                Simples Nacional / MEI
+              </h2>
+
+              <div className="grid md:grid-cols-3 gap-4">
+
+                <Card
+                  titulo="Optante Simples"
+                  valor={formatarBooleano(
+                    dados.simples?.simples
+                  )}
+                />
+
+                <Card
+                  titulo="Data Opção Simples"
+                  valor={formatarData(
+                    dados.simples?.data_opcao_simples
+                  )}
+                />
+
+                <Card
+                  titulo="Data Exclusão Simples"
+                  valor={formatarData(
+                    dados.simples?.data_exclusao_simples
+                  )}
+                />
+
+                <Card
+                  titulo="Optante MEI"
+                  valor={formatarBooleano(
+                    dados.simples?.mei
+                  )}
+                />
+
+                <Card
+                  titulo="Data Opção MEI"
+                  valor={formatarData(
+                    dados.simples?.data_opcao_mei
+                  )}
+                />
+
+                <Card
+                  titulo="Data Exclusão MEI"
+                  valor={formatarData(
+                    dados.simples?.data_exclusao_mei
+                  )}
+                />
+
+              </div>
+
+            </div>
+
+            {/* SÓCIOS */}
+            <div className="bg-white rounded-3xl shadow-xl p-6 mb-6 overflow-auto">
+
+              <h2 className="text-2xl font-bold mb-6">
+                Sócios
+              </h2>
+
+              {dados.socios?.length ? (
+
+                <div className="overflow-auto">
+
+                  <table className="min-w-full border-collapse text-sm">
+
+                    <thead>
+
+                      <tr className="bg-slate-100">
+
+                        {[
+                          "Nome",
+                          "CPF/CNPJ",
+                          "Tipo",
+                          "Qualificação",
+                          "Entrada",
+                          "Faixa Etária",
+                          "País",
+                          "Representante Legal",
+                          "Nome Representante",
+                          "Qualificação Representante"
+                        ].map((coluna) => (
+
+                          <th
+                            key={coluna}
+                            className="text-left p-3 border"
+                          >
+                            {coluna}
+                          </th>
+
+                        ))}
+
+                      </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                      {dados.socios.map(
+                        (
+                          socio,
+                          index
+                        ) => (
+
+                          <tr
+                            key={index}
+                            className="hover:bg-slate-50"
+                          >
+
+                            <td className="p-3 border">
+                              {socio.nome || "-"}
+                            </td>
+
+                            <td className="p-3 border">
+                              {formatarCpfCnpj(
+                                socio.cpf_cnpj_socio
+                              )}
+                            </td>
+
+                            <td className="p-3 border">
+                              {socio.tipo || "-"}
+                            </td>
+
+                            <td className="p-3 border">
+                              {socio.qualificacao_socio?.descricao || "-"}
+                            </td>
+
+                            <td className="p-3 border">
+                              {formatarData(
+                                socio.data_entrada
+                              )}
+                            </td>
+
+                            <td className="p-3 border">
+                              {socio.faixa_etaria || "-"}
+                            </td>
+
+                            <td className="p-3 border">
+                              {socio.pais?.nome || "-"}
+                            </td>
+
+                            <td className="p-3 border">
+                              {socio.representante_legal || "-"}
+                            </td>
+
+                            <td className="p-3 border">
+                              {socio.nome_representante || "-"}
+                            </td>
+
+                            <td className="p-3 border">
+                              {socio.qualificacao_representante?.descricao || "-"}
+                            </td>
+
+                          </tr>
+
+                        )
+                      )}
+
+                    </tbody>
+
+                  </table>
+
+                </div>
+
+              ) : (
+
+                <div className="text-slate-500">
+                  Nenhum sócio encontrado.
+                </div>
+
+              )}
+
+            </div>
+
+            {/* CNAE PRINCIPAL */}
+            <div className="bg-white rounded-3xl shadow-xl p-6 mb-6 overflow-auto">
+
+              <h2 className="text-2xl font-bold mb-6">
+                CNAE Principal
+              </h2>
+
+              <table className="w-full border-collapse text-sm">
+
+                <thead>
+
+                  <tr className="bg-slate-100">
+
+                    {Object.keys(
+                      dados.estabelecimento?.atividade_principal || {}
+                    ).map((coluna) => (
+
+                      <th
+                        key={coluna}
+                        className="text-left p-3 border"
+                      >
+                        {coluna}
+                      </th>
+
+                    ))}
+
+                  </tr>
+
+                </thead>
+
+                <tbody>
+
+                  <tr>
+
+                    {Object.values(
+                      dados.estabelecimento?.atividade_principal || {}
+                    ).map((valor, index) => (
+
+                      <td
+                        key={index}
+                        className="p-3 border"
+                      >
+                        {String(valor)}
+                      </td>
+
+                    ))}
+
+                  </tr>
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+            {/* CNAES SECUNDÁRIOS */}
+            <div className="bg-white rounded-3xl shadow-xl p-6 mb-6 overflow-auto">
+
+              <h2 className="text-2xl font-bold mb-6">
+                CNAEs Secundários
+              </h2>
+
+              {dados.estabelecimento
+                ?.atividades_secundarias
+                ?.length ? (
+
+                <table className="w-full border-collapse text-sm">
+
+                  <thead>
+
+                    <tr className="bg-slate-100">
+
+                      {Object.keys(
+                        dados.estabelecimento
+                          .atividades_secundarias[0]
+                      ).map((coluna) => (
+
+                        <th
+                          key={coluna}
+                          className="text-left p-3 border"
+                        >
+                          {coluna}
+                        </th>
+
+                      ))}
+
+                    </tr>
+
+                  </thead>
+
+                  <tbody>
+
+                    {dados.estabelecimento.atividades_secundarias.map(
+                      (
+                        atividade,
+                        index
+                      ) => (
+
+                        <tr
+                          key={index}
+                          className="hover:bg-slate-50"
+                        >
+
+                          {Object.values(
+                            atividade
+                          ).map(
+                            (
+                              valor,
+                              idx
+                            ) => (
+
+                              <td
+                                key={idx}
+                                className="p-3 border"
+                              >
+                                {String(valor)}
+                              </td>
+
+                            )
+                          )}
+
+                        </tr>
+
+                      )
+                    )}
+
+                  </tbody>
+
+                </table>
+
+              ) : (
+
+                <div className="text-slate-500">
+                  Nenhum CNAE secundário encontrado.
+                </div>
+
+              )}
+
+            </div>
+
+            {/* INSCRIÇÕES ESTADUAIS */}
+            <div className="bg-white rounded-3xl shadow-xl p-6 mb-6 overflow-auto">
+
+              <h2 className="text-2xl font-bold mb-6">
+                Inscrições Estaduais
+              </h2>
+
+              {dados.estabelecimento
+                ?.inscricoes_estaduais
+                ?.length ? (
+
+                <table className="w-full border-collapse text-sm">
+
+                  <thead>
+
+                    <tr className="bg-slate-100">
+
+                      {Object.keys(
+                        dados.estabelecimento
+                          .inscricoes_estaduais[0]
+                      ).map((coluna) => (
+
+                        <th
+                          key={coluna}
+                          className="text-left p-3 border"
+                        >
+                          {coluna}
+                        </th>
+
+                      ))}
+
+                    </tr>
+
+                  </thead>
+
+                  <tbody>
+
+                    {dados.estabelecimento.inscricoes_estaduais.map(
+                      (
+                        ie,
+                        index
+                      ) => (
+
+                        <tr
+                          key={index}
+                          className="hover:bg-slate-50"
+                        >
+
+                          {Object.values(
+                            ie
+                          ).map(
+                            (
+                              valor,
+                              idx
+                            ) => (
+
+                              <td
+                                key={idx}
+                                className="p-3 border"
+                              >
+{typeof valor === "boolean"
+  ? valor
+    ? "Sim"
+    : "Não"
+  : typeof valor === "object"
+    ? valor?.nome && valor?.sigla
+      ? `${valor.nome} - ${valor.sigla}`
+      : JSON.stringify(valor)
+    : String(valor)}
+                              </td>
+
+                            )
+                          )}
+
+                        </tr>
+
+                      )
+                    )}
+
+                  </tbody>
+
+                </table>
+
+              ) : (
+
+                <div className="text-slate-500">
+                  Nenhuma inscrição estadual encontrada.
+                </div>
+
+              )}
+
+            </div>
+
+          </>
+        )}
+
+      </div>
+
+    </div>
+
+  );
+}
+
+ReactDOM.createRoot(
+  document.getElementById("root")
+).render(<App />);
+
+</script>
+
+</body>
+</html>
